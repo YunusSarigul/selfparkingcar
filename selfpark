@@ -1,0 +1,246 @@
+#include <Servo.h>
+Servo servo;
+int echoOn = 3 ; // Echo Pin
+int trigOn = 4 ; // Trigger Pin
+int echoArkaSag = 7 ; // Echo Pin
+int trigArkaSag = 8 ; // Trigger Pin
+int echoOrta = 9 ; // Echo Pin
+int trigOrta = 10 ; // Trigger Pin
+#define echoArka A3 // Echo Pin
+#define trigArka A2 // Trigger Pin
+int echoArkaSol = 12 ; // Echo Pin
+int trigArkaSol = 13 ; // Trigger Pin
+int encPin = 2 ;
+int sayi = 0 ;
+long  sure, mesafe, mesafeOn, mesafeOnSag, mesafeOrta, mesafeArka, mesafeArkaSol, mesafeArkaSag ;
+int AIA = 6 ;
+int AIB = 5 ;
+#define BIA A0
+#define BIB A1
+int servoPin = 11 ;
+int sag = 30 ;
+int sol = 90 ;
+int duz = 60 ;
+int ileri ;
+int geri ;
+int durum  ;
+int sayac = 0 ;
+boolean uygun ;
+
+void setup() {
+
+  Serial.begin (9600);
+  pinMode(trigOn, OUTPUT);
+  pinMode(echoOn, INPUT);
+  pinMode(trigOrta, OUTPUT);
+  pinMode(echoOrta, INPUT);
+  pinMode(trigArka, OUTPUT);
+  pinMode(echoArka, INPUT);
+  pinMode(trigArkaSol, OUTPUT);
+  pinMode(echoArkaSol, INPUT);
+  pinMode(trigArkaSag, OUTPUT);
+  pinMode(echoArkaSag, INPUT);
+  pinMode(AIB, OUTPUT);
+  pinMode(AIA, OUTPUT);
+  pinMode(BIA, OUTPUT);
+  pinMode(BIB, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(encPin, INPUT);
+  attachInterrupt(0, say, CHANGE);
+  servo.attach(servoPin);
+  durum = 0 ;
+
+}
+/////////////////////////////////////////////////////////////////////////////////
+// DONGU BASLANGICI //
+/////////////////////////////////////////////////////////////////////////////////
+void loop() {
+  switch (durum) {
+
+    /*  İlk durum : Arac ile yan yüzey arasındaki mesafe 15cm den küçük ise
+       düz devam eder.
+       Eğer mesafe 15cm den büyük ise "durum1" e geçilir.
+    */
+
+/////////////////////////////////////////////////////////////////////////////////
+    case 0 :
+      mesafeOrta = getMesafe(echoOrta, trigOrta) ;
+      Serial.println("Durum 0 . ");
+      if (mesafeOrta < 15) {
+        durum = 0 ;
+        //ileri() ;
+        sayi = 0 ;
+        ileri = 180 ;
+        geri = 0 ;
+        hareket(ileri, geri, duz);
+        Serial.print("Mesafe : ");
+        Serial.println(mesafeOrta);
+      }
+      else {
+        durum = 7 ;
+      }
+
+      break;
+
+    /*  İkinci durum : Boşluğun, aracın park etmesine yetecek uzunlukta
+       olup olmadığının ölçüldüğü durumdur. Mesafe 10cm den büyük olduğu
+       sürece bu ölçüm sürer. Bu ölçüm için tutulan sayac değeri eğer
+       200 den büyük ise boşluk alan parka uygun demektir. "durum2" ye
+       geçilir.
+    */
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 1 :
+      Serial.println("Durum 1.");
+      mesafeOrta = getMesafe(echoOrta, trigOrta) ;
+      Serial.print("Sayi : ");
+      Serial.println(sayi);
+      if (mesafeOrta > 15 ) {
+        ileri = 180 ;
+        geri = 0 ;
+        hareket(ileri, geri, duz);
+      }
+      else {
+        if (sayi > 200) {
+          durum = 2 ;
+          //sayi = 0 ;
+        }
+        else {
+          sayi = 0 ;
+          durum = 7 ;
+        }
+      }
+      if (sayi > 200) {
+        durum = 2 ;
+        //sayi = 0 ;
+      }
+      break;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 2 :
+      Serial.println("Durum 2.");
+      ileri = 180 ;
+      geri = 0 ;
+      hareket(ileri, geri, sol);
+      if (sayi > 300) {
+        durum = 3 ;
+        //sayi = 0 ;
+      }
+      break ;
+
+    /* Park alanı bulduktan sonra aracın rahat park edebilmesi için
+       belli bir mesafe kadar daha ileri doğru devam etmesi lazım.
+       Gerekli mesafe katedildikten sonra "durum3" e geçilir.
+    */
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 3 :
+      ileri = 0 ;
+      geri = 200 ;
+      hareket(ileri, geri, sag);
+      Serial.println("Durum 3.");
+      Serial.println("Arka sol 15 den kucuk mu?");
+      mesafeArkaSol = getMesafe(echoArkaSol, trigArkaSol);
+      Serial.println(mesafeArkaSol);
+      if (mesafeArkaSol < 25) {
+        durum = 4 ;
+      }
+      break;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 4 :
+      ileri = 0 ;
+      geri = 180 ;
+      hareket(ileri, geri, sol);
+      Serial.println("Durum 4.");
+      mesafeArkaSol = getMesafe(echoArkaSol, trigArkaSol);
+      if (mesafeArkaSol < 7) {
+        Serial.println("Durum 4 sart sagladi");
+        durum = 5;
+      }
+      break;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 5 :
+      ileri = 200 ;
+      geri = 0 ;
+      hareket(ileri, geri, sag);
+      mesafeOn = getMesafe(echoOn, trigOn);
+      if (mesafeOn < 6)
+        durum = 6 ;
+      break ;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 6 :
+      ileri = 0 ;
+      geri = 200 ;
+      hareket(ileri, geri, sol);
+      mesafeOn = getMesafe(echoOn, trigOn);
+      mesafeArka = getMesafe(echoArka, trigArka);
+      if (mesafeOn + 1 == mesafeArka || mesafeOn == mesafeArka + 1)
+        durum = 7 ;
+      break ;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+    case 7 :
+      ileri = 0 ;
+      geri = 0 ;
+      hareket(ileri, geri, duz);
+      break ;
+
+  }
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// DONGU BITISI //
+/////////////////////////////////////////////////////////////////////////////////
+void sayacSifirla() {
+  sayac = 0 ;
+}
+
+void sayacArttir() {
+  sayac ++ ;
+  delay(30) ;
+  //Serial.print("SayacArttir");
+}
+
+int getSayac() {
+  return sayac ;
+}
+
+long getMesafe(int echoPin, int trigPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  sure = pulseIn(echoPin, HIGH);
+  mesafe = sure * 0.034 / 2;
+  return mesafe ;
+
+}
+
+void dur () {
+  hareket(0, 0, duz);
+  delay(1000);
+}
+
+void hareket(int ileri, int geri, int yon) {
+  analogWrite(AIB, geri);
+  analogWrite(AIA, ileri);
+  digitalWrite(BIB, HIGH);
+  digitalWrite(BIA, HIGH);
+  servo.write(yon);
+}
+
+void say() {
+  sayi++ ;
+}
